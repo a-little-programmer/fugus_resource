@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>菌种资源库实体召回</title>
+    <link rel="stylesheet" href="/styles.css">
+  </head>
+  <body>
+    <main class="shell">
+      <section class="workspace">
+        <header class="topbar">
+          <div>
+            <h1>菌种资源库实体召回</h1>
+            <p id="status">加载索引状态中...</p>
+          </div>
+          <div class="threshold">
+            <label for="threshold">阈值</label>
+            <input id="threshold" type="number" min="0" max="1" step="0.01" value="0.82">
+          </div>
+        </header>
+
+        <form id="search-form" class="searchbar">
+          <input
+            id="query"
+            name="query"
+            type="search"
+            autocomplete="off"
+            placeholder="输入金葡菌、E.coli、黄色葡萄球菌、Escherichia colli"
+            required
+          >
+          <select id="top-k" aria-label="返回数量">
+            <option value="3">Top 3</option>
+            <option value="5" selected>Top 5</option>
+            <option value="10">Top 10</option>
+          </select>
+          <button type="submit">检索</button>
+        </form>
+
+        <section class="result-panel" aria-live="polite">
+          <div class="panel-head">
+            <div>
+              <h2>召回结果</h2>
+              <p id="message">输入查询后查看标准实体候选。</p>
+            </div>
+            <div id="summary" class="summary"></div>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>标准中文名</th>
+                  <th>拉丁名</th>
+                  <th>来源</th>
+                  <th>分数</th>
+                  <th>命中名称</th>
+                  <th>状态</th>
+                </tr>
+              </thead>
+              <tbody id="results">
+                <tr class="empty">
+                  <td colspan="6">暂无结果</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+      </section>
+    </main>
+    <script src="/app.js"></script>
+  </body>
+</html>

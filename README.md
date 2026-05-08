@@ -150,6 +150,34 @@ MRR
 reports/embedding_eval.json
 ```
 
+## 当前实验结果
+
+当前数据集包含 154 个 taxon 实体，评估集包含 136 条查询，其中 alias split 44 条、entity split 92 条。
+
+`canonical` 模式只使用标准中文名和标准拉丁名作为候选，更适合衡量模型是否学会把非标准表达拉近到标准表达。
+
+| 模型 | Split | Top1 Accuracy | Top3 Recall | MRR | 查询数 |
+| --- | --- | ---: | ---: | ---: | ---: |
+| BAAI/bge-small-zh-v1.5 | all | 0.8971 | 0.9485 | 0.9267 | 136 |
+| models/fugus-entity-embedding | all | 0.9265 | 0.9412 | 0.9393 | 136 |
+| BAAI/bge-small-zh-v1.5 | entity | 0.9239 | 0.9783 | 0.9542 | 92 |
+| models/fugus-entity-embedding | entity | 0.9674 | 0.9783 | 0.9783 | 92 |
+| BAAI/bge-small-zh-v1.5 | alias | 0.8409 | 0.8864 | 0.8693 | 44 |
+| models/fugus-entity-embedding | alias | 0.8409 | 0.8636 | 0.8580 | 44 |
+
+`all-names` 模式会把别名和曾用名也放入候选，更接近真实检索场景，但不适合单独证明模型学会了标准化。
+
+| 模型 | Split | Top1 Accuracy | Top3 Recall | MRR | 查询数 |
+| --- | --- | ---: | ---: | ---: | ---: |
+| BAAI/bge-small-zh-v1.5 | all | 1.0000 | 1.0000 | 1.0000 | 136 |
+| models/fugus-entity-embedding | all | 0.9632 | 1.0000 | 0.9804 | 136 |
+| BAAI/bge-small-zh-v1.5 | entity | 1.0000 | 1.0000 | 1.0000 | 92 |
+| models/fugus-entity-embedding | entity | 0.9565 | 1.0000 | 0.9783 | 92 |
+| BAAI/bge-small-zh-v1.5 | alias | 1.0000 | 1.0000 | 1.0000 | 44 |
+| models/fugus-entity-embedding | alias | 0.9773 | 1.0000 | 0.9848 | 44 |
+
+在 `canonical` 评估中，微调模型的整体 Top1 从 0.8971 提升到 0.9265，entity split Top1 从 0.9239 提升到 0.9674，说明微调后模型对标准实体表达的对齐能力有所提升。
+
 ## 构建索引
 
 ```bash

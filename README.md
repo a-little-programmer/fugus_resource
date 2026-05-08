@@ -1,70 +1,122 @@
-# 菌种资源库 Taxon 实体 Hybrid Embedding 召回原型
+# 菌种资源库实体召回
 
-这个原型实现了三层召回流程：
+面向菌种资源库的标准实体召回工具。系统支持将用户输入的非标准名称、简称、旧称或拉丁名缩写，匹配到库内标准菌种实体。
 
-1. 库内标准名、别名、曾用名的 normalized exact match。
-2. 基于库内 `scientific_name` 的拉丁属名缩写解析。
-3. embedding 兜底召回，同一实体多个名称向量取 max score。
+示例：
 
-默认优先使用 `sentence-transformers` 和 `BAAI/bge-m3`。如果当前环境没有安装依赖，程序会自动退到标准库字符 n-gram fallback，便于离线验证流程。
-
-## Usage
-
-```bash
-python3 search_cli.py build --data data/species_entities.jsonl --index artifacts/species_index.pkl --alias artifacts/alias_dict.json
-python3 search_cli.py query "金葡菌"
-python3 search_cli.py query "E.coli"
-python3 search_cli.py query "黄色葡萄球菌" --top-k 3
-python3 search_cli.py eval --top-k 3
+```text
+金葡菌        -> 金黄色葡萄球菌
+E.coli        -> 大肠埃希氏菌
+P. fluorescens -> 荧光假单胞菌
+黄色葡萄球菌  -> 金黄色葡萄球菌
 ```
 
-## Web UI
+## 功能
 
-```bash
-python3 search_server.py --host 127.0.0.1 --port 8000
+- 支持中文标准名、别名、曾用名的精确匹配
+- 支持拉丁名缩写和格式归一，如 `E.coli`、`E . coli`、`Ｅ． ｃｏｌｉ`
+- 支持向量召回，用于处理模糊表达和轻微拼写错误
+- 支持低置信度标记，避免将泛查询强行归一到某个实体
+- 提供命令行工具和本地 Web 页面
+
+## 项目结构
+
+```text
+data/                  实体数据
+src/                   检索、规范化、索引构建逻辑
+web/                   前端页面
+tests/                 单元测试
+search_cli.py          命令行入口
+search_server.py       本地 Web 服务
+run_web.py             Web 页面启动脚本
+requirements.txt       Python 依赖
 ```
 
-然后打开 `http://127.0.0.1:8000`。如果模型已经缓存好但当前网络不可用，可以用离线模式启动：
+## 环境准备
+
+建议使用 Python 3.11。
 
 ```bash
-HF_HUB_OFFLINE=1 TRANSFORMERS_OFFLINE=1 python3 search_server.py
+conda create --prefix ./.conda-env python=3.11 -y
+conda activate ./.conda-env
+pip install -r requirements.txt
 ```
 
-也可以用简化启动脚本：
+默认模型为 `BAAI/bge-m3`。首次运行时会从 Hugging Face 下载模型；如果模型已经缓存到本机，也可以离线运行。
+
+## 构建索引
 
 ```bash
-python3 run_web.py
+python search_cli.py build
 ```
 
-## Crawl CICC Product Lists
+构建完成后会生成：
 
-抓取 `mid=1` 下每个推荐列表页，输出候选 taxon：
+```text
+artifacts/alias_dict.json
+artifacts/species_index.pkl
+```
+
+## 命令行查询
 
 ```bash
-python3 scripts/crawl_cicc_products.py \
-  --start-url "https://www.china-cicc.org/cicc/product/?mid=1" \
-  --output data/cicc_food_candidates.jsonl
+python search_cli.py query "金葡菌"
+python search_cli.py query "E.coli"
+python search_cli.py query "黄色葡萄球菌" --top-k 3
 ```
 
-把候选和当前 demo 数据去重合并：
+输出字段包括标准中文名、拉丁名、命中来源、相似度分数和置信度状态。
+
+## 启动 Web 页面
 
 ```bash
-python3 scripts/merge_taxon_jsonl.py \
-  --base data/species_entities.jsonl \
-  --candidates data/cicc_food_candidates.jsonl \
-  --output data/species_entities.merged.jsonl
+python run_web.py
 ```
 
-确认 `data/species_entities.merged.jsonl` 后，替换主数据并重建索引：
+浏览器打开：
+
+```text
+http://127.0.0.1:8000
+```
+
+如果需要指定端口：
 
 ```bash
-mv data/species_entities.merged.jsonl data/species_entities.jsonl
-HF_HUB_OFFLINE=1 TRANSFORMERS_OFFLINE=1 python3 search_cli.py build
+python run_web.py --host 127.0.0.1 --port 8010
 ```
 
-强制使用 fallback 后端：
+## 数据格式
+
+主数据文件为：
+
+```text
+data/species_entities.jsonl
+```
+
+每行一个 JSON 对象：
+
+```json
+{
+  "entity_id": "TAXON:0001",
+  "standard_name_cn": "金黄色葡萄球菌",
+  "scientific_name": "Staphylococcus aureus",
+  "taxon_rank": "species",
+  "aliases": ["金葡菌", "S. aureus"],
+  "former_names": ["Micrococcus aureus"],
+  "metadata": {
+    "genus_cn": "葡萄球菌属"
+  }
+}
+```
+
+`aliases` 和 `former_names` 会参与精确匹配和向量索引。`metadata` 只作为补充信息保存，不参与召回逻辑。
+
+## 测试
 
 ```bash
-python3 search_cli.py build --backend char-ngram
-python3 search_cli.py query "Escherichia colli" --backend char-ngram
+python -m unittest discover -s tests
 ```
+
+## 说明
+
+当前版本以 taxon 级实体标准化为主，不处理具体菌株编号、保藏编号或实验室株系编号，例如 `ATCC 25922`、`CGMCC`、`CICC 10001`、`DH5α`、`BL21`。这类编号需要结合字符串匹配或专门的菌株级索引处理。

@@ -9,7 +9,7 @@ from pathlib import Path
 from typing import Any
 
 from src.alias_matcher import build_alias_dict, load_alias_dict, match_alias, save_alias_dict
-from src.embedder import create_embedder
+from src.embedder import DEFAULT_FINE_TUNED_MODEL, create_embedder
 from src.entity_index import EntityIndex, SearchResult
 from src.latin_expander import build_latin_lookup, expand_latin_abbreviation
 from src.normalization import display_normalized_text
@@ -19,7 +19,7 @@ from src.search_service import result_to_dict
 DEFAULT_DATA_PATH = "data/species_entities.jsonl"
 DEFAULT_ALIAS_PATH = "artifacts/alias_dict.json"
 DEFAULT_INDEX_PATH = "artifacts/species_index.pkl"
-DEFAULT_MODEL_NAME = "BAAI/bge-m3"
+DEFAULT_MODEL_NAME = DEFAULT_FINE_TUNED_MODEL
 DEFAULT_THRESHOLD = 0.82
 
 

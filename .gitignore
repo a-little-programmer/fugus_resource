@@ -4,6 +4,10 @@ __pycache__/
 *.py[cod]
 .pytest_cache/
 artifacts/
+models/
+reports/
+data/train_triplets.jsonl
+data/eval_queries.jsonl
 
 data/cicc_food_candidates.jsonl
 data/species_entities.merged.jsonl

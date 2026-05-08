@@ -8,11 +8,17 @@ environments and in tests.
 from __future__ import annotations
 
 import hashlib
+import logging
 import math
 from collections import Counter
+from pathlib import Path
 from typing import Protocol
 
 from .normalization import normalize_text
+
+
+DEFAULT_FINE_TUNED_MODEL = "models/fugus-entity-embedding"
+DEFAULT_BASE_MODEL = "BAAI/bge-small-zh-v1.5"
 
 
 class Embedder(Protocol):
@@ -65,20 +71,33 @@ class CharNgramEmbedder:
         return normalize_vector(vector)
 
 
-def create_embedder(model_name: str, backend: str = "auto") -> Embedder:
+def resolve_model_name(model_name: str | None) -> str:
+    requested = model_name or DEFAULT_FINE_TUNED_MODEL
+    if requested == DEFAULT_FINE_TUNED_MODEL and not Path(requested).exists():
+        logging.warning(
+            "未找到微调模型 %s，正在使用预训练 Base 模型 %s，检索效果可能受限。",
+            DEFAULT_FINE_TUNED_MODEL,
+            DEFAULT_BASE_MODEL,
+        )
+        return DEFAULT_BASE_MODEL
+    return requested
+
+
+def create_embedder(model_name: str | None = None, backend: str = "auto") -> Embedder:
     if backend == "char-ngram":
         return CharNgramEmbedder()
     if backend not in {"auto", "sentence-transformers"}:
         raise ValueError(f"Unsupported embedding backend: {backend}")
 
+    resolved_model_name = resolve_model_name(model_name)
     try:
-        return SentenceTransformerEmbedder(model_name)
+        return SentenceTransformerEmbedder(resolved_model_name)
     except Exception as exc:
         if backend == "sentence-transformers":
             raise
-        print(
-            "Warning: sentence-transformers backend unavailable; "
-            f"using char-ngram fallback. Reason: {exc}"
+        logging.warning(
+            "sentence-transformers backend unavailable; using char-ngram fallback. Reason: %s",
+            exc,
         )
         return CharNgramEmbedder()
 

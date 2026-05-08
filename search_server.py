@@ -11,14 +11,14 @@ from pathlib import Path
 from urllib.parse import parse_qs, urlparse
 
 from src.alias_matcher import load_alias_dict
-from src.embedder import Embedder, create_embedder
+from src.embedder import DEFAULT_FINE_TUNED_MODEL, Embedder, create_embedder
 from src.entity_index import EntityIndex
 from src.search_service import retrieve
 
 
 DEFAULT_ALIAS_PATH = "artifacts/alias_dict.json"
 DEFAULT_INDEX_PATH = "artifacts/species_index.pkl"
-DEFAULT_MODEL_NAME = "BAAI/bge-m3"
+DEFAULT_MODEL_NAME = DEFAULT_FINE_TUNED_MODEL
 DEFAULT_THRESHOLD = 0.82
 WEB_ROOT = Path(__file__).resolve().parent / "web"
 

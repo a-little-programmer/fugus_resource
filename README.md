@@ -1,6 +1,6 @@
 # 菌种资源库实体召回
 
-面向菌种资源库的标准实体召回工具。系统支持将用户输入的非标准名称、简称、旧称或拉丁名缩写，匹配到库内标准菌种实体。
+面向菌种资源库的领域 embedding 训练与实体召回项目。目标是微调一个更懂菌种名称、简称、旧称和拉丁名缩写的向量模型，使同一标准实体的不同表达在向量空间中更接近。
 
 示例：
 
@@ -13,11 +13,13 @@ P. fluorescens -> 荧光假单胞菌
 
 ## 功能
 
+- 从菌种实体数据生成 `anchor / positive / hard_negative` 三元组训练样本
+- 支持 alias split 和 entity split 两类评估集
+- 支持基于 `sentence-transformers` 微调 embedding 模型
+- 支持 base model 与微调模型的 topK 评估
 - 支持中文标准名、别名、曾用名的精确匹配
 - 支持拉丁名缩写和格式归一，如 `E.coli`、`E . coli`、`Ｅ． ｃｏｌｉ`
-- 支持向量召回，用于处理模糊表达和轻微拼写错误
-- 支持低置信度标记，避免将泛查询强行归一到某个实体
-- 提供命令行工具和本地 Web 页面
+- 提供命令行检索和本地 Web 页面用于模型效果展示
 
 ## 项目结构
 
@@ -26,6 +28,8 @@ data/                  实体数据
 src/                   检索、规范化、索引构建逻辑
 web/                   前端页面
 tests/                 单元测试
+train_embedding.py     embedding 微调入口
+evaluate_embedding.py  embedding 评估入口
 search_cli.py          命令行入口
 search_server.py       本地 Web 服务
 run_web.py             Web 页面启动脚本
@@ -42,13 +46,117 @@ conda activate ./.conda-env
 pip install -r requirements.txt
 ```
 
-默认模型为 `BAAI/bge-m3`。首次运行时会从 Hugging Face 下载模型；如果模型已经缓存到本机，也可以离线运行。
+训练原型默认使用 `BAAI/bge-small-zh-v1.5`。该模型比 `BAAI/bge-m3` 更轻，适合先跑通训练和评估流程。后续可以在显存充足时切换到更大的模型。
+
+## 生成训练数据
+
+```bash
+python scripts/build_training_data.py
+```
+
+默认输出：
+
+```text
+data/train_triplets.jsonl
+data/eval_queries.jsonl
+```
+
+训练样本格式：
+
+```json
+{
+  "anchor": "金葡菌",
+  "positive": "金黄色葡萄球菌",
+  "hard_negative": "表皮葡萄球菌",
+  "entity_id": "TAXON:0001"
+}
+```
+
+其中 `hard_negative` 优先来自同属不同种或名称相近实体。
+
+## 微调模型
+
+```bash
+python train_embedding.py \
+  --train data/train_triplets.jsonl \
+  --output models/fugus-entity-embedding \
+  --epochs 1 \
+  --batch-size 16
+```
+
+如果模型已经下载到本机但当前网络不稳定，可以加 `--offline`：
+
+```bash
+python train_embedding.py --epochs 1 --batch-size 16 --offline
+```
+
+显存较小时可以降低 batch size：
+
+```bash
+python train_embedding.py \
+  --batch-size 4 \
+  --gradient-accumulation-steps 4 \
+  --fp16
+```
+
+`--gradient-accumulation-steps` 依赖 `datasets` / `SentenceTransformerTrainer` 路径；如果环境中没有 `datasets`，脚本会退回到 `SentenceTransformer.fit` 训练路径，但不支持梯度累加。
+
+如果要尝试更大的模型：
+
+```bash
+python train_embedding.py --base-model BAAI/bge-m3 --batch-size 4 --fp16
+```
+
+## 评估模型
+
+```bash
+python evaluate_embedding.py
+```
+
+默认会评估 base model；如果存在 `models/fugus-entity-embedding`，会同时评估微调模型。
+
+评估候选有两种模式：
+
+```bash
+python evaluate_embedding.py --candidate-mode canonical
+python evaluate_embedding.py --candidate-mode all-names
+```
+
+离线评估：
+
+```bash
+python evaluate_embedding.py --candidate-mode canonical --offline
+```
+
+一次运行两种评估，并分别保存报告：
+
+```bash
+python run_eval.py
+```
+
+`canonical` 只把标准中文名和拉丁名作为候选，用于观察模型是否把非标准表达拉近到标准表达。`all-names` 会把别名和曾用名也作为候选，更接近真实检索效果，但指标通常会更高。
+
+输出指标包括：
+
+```text
+top1 accuracy
+top3 recall
+MRR
+```
+
+详细结果写入：
+
+```text
+reports/embedding_eval.json
+```
 
 ## 构建索引
 
 ```bash
 python search_cli.py build
 ```
+
+默认优先加载 `models/fugus-entity-embedding`。如果本地没有微调模型，会回退到 base model 并打印 warning。
 
 构建完成后会生成：
 
@@ -120,3 +228,5 @@ python -m unittest discover -s tests
 ## 说明
 
 当前版本以 taxon 级实体标准化为主，不处理具体菌株编号、保藏编号或实验室株系编号，例如 `ATCC 25922`、`CGMCC`、`CICC 10001`、`DH5α`、`BL21`。这类编号需要结合字符串匹配或专门的菌株级索引处理。
+
+Web 和 CLI 是模型效果展示入口，不是训练目标本身。项目核心目标是训练一个让菌种非标准表达与标准表达更接近的领域 embedding 模型。

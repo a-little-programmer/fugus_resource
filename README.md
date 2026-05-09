@@ -253,6 +253,22 @@ data/species_entities.jsonl
 python -m unittest discover -s tests
 ```
 
+## 非标准表达召回报告
+
+生成只包含 `aliases` 和 `former_names` 的召回自检报告：
+
+```bash
+python scripts/report_non_standard_recall.py
+```
+
+默认输出：
+
+```text
+reports/non_standard_recall_inputs.json
+```
+
+报告中的 `input` 是实际查询入参，`expected` 是期望标准实体，`actual_top1` 是系统返回的第一名。
+
 ## 说明
 
 当前版本以 taxon 级实体标准化为主，不处理具体菌株编号、保藏编号或实验室株系编号，例如 `ATCC 25922`、`CGMCC`、`CICC 10001`、`DH5α`、`BL21`。这类编号需要结合字符串匹配或专门的菌株级索引处理。
